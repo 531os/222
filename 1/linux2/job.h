@@ -51,6 +51,14 @@ struct waitqueue{
     struct waitqueue *next;
     struct jobinfo *job;
 };
+typedef struct queue{
+	struct waitqueue *wait_Q;
+	struct jobinfo *job;
+	int prio;
+	int round;
+	struct queue *next;
+}readyqueue;		
+	
 
 void scheduler();
 void sig_handler(int sig,siginfo_t *info,void *notused);
@@ -61,7 +69,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd);
 void do_deq(struct jobcmd deqcmd);
 void do_stat(struct jobcmd statcmd);
 void updateall();
-struct waitqueue* jobselect();
+struct queue* jobselect();
 void jobswitch();
 
 void error_doit(int errnoflag,const char *fmt,va_list ap);
