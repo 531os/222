@@ -10,47 +10,15 @@
 #include <time.h>
 #include "job.h"
 
-//#define DEBUG
-
 int jobid=0;
 int siginfo=1;
 int fifo;
 int globalfd;
 
+struct waitqueue *head=NULL;
+struct waitqueue *next=NULL,*current =NULL;
 
-readyqueue *Q=NULL,*head=NULL;
-
-readyqueue *next=NULL,*current =NULL;
-
-void creat_Q()
-{
-	readyqueue *tmp,*head1=NULL;
-	int i=0;
-	current=Q=head1;
-	for(;i<3;i++)
-	{
-		if((tmp = (readyqueue *)malloc(sizeof(readyqueue)))==NULL)  
-		{
-		   perror("malloc");  
-		   exit(1);  
-		}
-		tmp->wait_Q=NULL;
-		tmp ->prio = i+1;  
-		if(i+1==1)
-			tmp->round=1;
-		if(i+1==2)
-			tmp->round=2;
-		if(i+1==3)
-			tmp->round=5;  
-		if(head1==NULL)
-			{head1=tmp;continue;}
-		else
-			head1 ->next = tmp;
-		head1=head1->next;
-		head1->next=NULL;
-	}
-}
-/* 碌梅露脠鲁脤脨貌 */
+/* 调度程序 */
 void scheduler()
 {
 	struct jobinfo *newjob=NULL;
@@ -68,7 +36,7 @@ void scheduler()
 		printf("no data read\n");
 #endif
 
-	/* 啪眉脨脗碌脠沤媒露脫脕脨脰脨碌脛脳梅脪碌 */
+	/* 更新等待队列中的作业 */
 	updateall();
 
 	switch(cmd.type){
@@ -85,9 +53,9 @@ void scheduler()
 		break;
 	}
 
-	/* 脩隆脭帽啪脽脫脜脧脠艗露脳梅脪碌 */
+	/* 选择高优先级作业 */
 	next=jobselect();
-	/* 脳梅脪碌脟脨禄禄 */
+	/* 作业切换 */
 	jobswitch();
 }
 
@@ -98,13 +66,13 @@ int allocjid()
 
 void updateall()
 {
-	struct queue *p;
+	struct waitqueue *p;
 
-	/* 啪眉脨脗脳梅脪碌脭脣脨脨脢卤艗盲 */
+	/* 更新作业运行时间 */
 	if(current)
-		current->job->run_time += 1; /* 艗脫1沤煤卤铆1000ms */
+		current->job->run_time += 1; /* 加1代表1000ms */
 
-	/* 啪眉脨脗脳梅脪碌碌脠沤媒脢卤艗盲艗掳脫脜脧脠艗露 */
+	/* 更新作业等待时间及优先级 */
 	for(p = head; p != NULL; p = p->next){
 		p->job->wait_time += 1000;
 		if(p->job->wait_time >= 5000 && p->job->curpri < 3){
@@ -114,15 +82,15 @@ void updateall()
 	}
 }
 
-struct queue* jobselect()
+struct waitqueue* jobselect()
 {
-	struct queue *p,*prev,*select,*selectprev;
+	struct waitqueue *p,*prev,*select,*selectprev;
 	int highest = -1;
 
 	select = NULL;
 	selectprev = NULL;
 	if(head){
-		/* 卤茅脌煤碌脠沤媒露脫脕脨脰脨碌脛脳梅脪碌拢卢脮脪碌艙脫脜脧脠艗露脳卯啪脽碌脛脳梅脪碌 */
+		/* 遍历等待队列中的作业，找到优先级最高的作业 */
 		for(prev = head, p = head; p != NULL; prev = p,p = p->next)
 			if(p->job->curpri > highest){
 				select = p;
@@ -138,21 +106,16 @@ struct queue* jobselect()
 
 void jobswitch()
 {
-	struct queue *p;
+	struct waitqueue *p;
 	int i;
-	#ifdef DEBUG
-		printf("job is switching!\n");
-		printf("%d",current->job->pid);
-	#endif
 
-
-	if(current && current->job->state == DONE){ /* 碌卤脟掳脳梅脪碌脥锚鲁脡 */
-		/* 脳梅脪碌脥锚鲁脡拢卢脡鸥鲁媒脣眉 */
+	if(current && current->job->state == DONE){ /* 当前作业完成 */
+		/* 作业完成，删除它 */
 		for(i = 0;(current->job->cmdarg)[i] != NULL; i++){
 			free((current->job->cmdarg)[i]);
 			(current->job->cmdarg)[i] = NULL;
 		}
-		/* 脢脥路脜驴脮艗盲 */
+		/* 释放空间 */
 		free(current->job->cmdarg);
 		free(current->job);
 		free(current);
@@ -160,10 +123,10 @@ void jobswitch()
 		current = NULL;
 	}
 
-	if(next == NULL && current == NULL) /* 脙禄脫脨脳梅脪碌脪陋脭脣脨脨 */
+	if(next == NULL && current == NULL) /* 没有作业要运行 */
 
 		return;
-	else if (next != NULL && current == NULL){ /* 驴陋脢艗脨脗碌脛脳梅脪碌 */
+	else if (next != NULL && current == NULL){ /* 开始新的作业 */
 
 		printf("begin start new job\n");
 		current = next;
@@ -172,7 +135,7 @@ void jobswitch()
 		kill(current->job->pid,SIGCONT);
 		return;
 	}
-	else if (next != NULL && current != NULL){ /* 脟脨禄禄脳梅脪碌 */
+	else if (next != NULL && current != NULL){ /* 切换作业 */
 
 		printf("switch to Pid: %d\n",next->job->pid);
 		kill(current->job->pid,SIGSTOP);
@@ -180,7 +143,7 @@ void jobswitch()
 		current->job->wait_time = 0;
 		current->job->state = READY;
 
-		/* 路脜禄脴碌脠沤媒露脫脕脨 */
+		/* 放回等待队列 */
 		if(head){
 			for(p = head; p->next != NULL; p = p->next);
 			p->next = current;
@@ -193,7 +156,7 @@ void jobswitch()
 		current->job->wait_time = 0;
 		kill(current->job->pid,SIGCONT);
 		return;
-	}else{ /* next == NULL脟脪current != NULL拢卢虏禄脟脨禄禄 */
+	}else{ /* next == NULL且current != NULL，不切换 */
 		return;
 	}
 }
@@ -204,13 +167,10 @@ void sig_handler(int sig,siginfo_t *info,void *notused)
 	int ret;
 
 	switch (sig) {
-case SIGVTALRM: /* 碌艙沤茂艗脝脢卤脝梅脣霉脡猫脰脙碌脛艗脝脢卤艗盲啪么 */
+case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 	scheduler();
-	#ifdef DEBUG
-		printf("SIGVTALRM RECEVIRD!");
-	#endif
 	return;
-case SIGCHLD: /* 脳脫艙酶鲁脤艙谩脢酶脢卤沤芦脣脥啪酶啪啪艙酶鲁脤碌脛脨脜潞脜 */
+case SIGCHLD: /* 子进程结束时传送给父进程的信号 */
 	ret = waitpid(-1,&status,WNOHANG);
 	if (ret == 0)
 		return;
@@ -230,7 +190,7 @@ case SIGCHLD: /* 脳脫艙酶鲁脤艙谩脢酶脢卤沤芦脣脥啪酶啪啪艙酶鲁脤碌脛脨脜潞脜 */
 
 void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 {
-	struct queue *newnode,*p;
+	struct waitqueue *newnode,*p;
 	int i=0,pid;
 	char *offset,*argvec,*q;
 	char **arglist;
@@ -238,7 +198,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 
 	sigemptyset(&zeromask);
 
-	/* 路芒脳掳jobinfo脢媒鸥脻艙谩鹿鹿 */
+	/* 封装jobinfo数据结构 */
 	newjob = (struct jobinfo *)malloc(sizeof(struct jobinfo));
 	newjob->jid = allocjid();
 	newjob->defpri = enqcmd.defpri;
@@ -273,8 +233,8 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 
 #endif
 
-	/*脧貌碌脠沤媒露脫脕脨脰脨脭枚艗脫脨脗碌脛脳梅脪碌*/
-	newnode = (struct queue*)malloc(sizeof(struct queue));
+	/*向等待队列中增加新的作业*/
+	newnode = (struct waitqueue*)malloc(sizeof(struct waitqueue));
 	newnode->next =NULL;
 	newnode->job=newjob;
 
@@ -285,13 +245,13 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 	}else
 		head=newnode;
 
-	/*脦陋脳梅脪碌沤沤艙拧艙酶鲁脤*/
+	/*为作业创建进程*/
 	if((pid=fork())<0)
 		error_sys("enq fork failed");
 
 	if(pid==0){
 		newjob->pid =getpid();
-		/*脳猫脠没脳脫艙酶鲁脤,碌脠碌脠脰沤脨脨*/
+		/*阻塞子进程,等等执行*/
 		raise(SIGSTOP);
 #ifdef DEBUG
 
@@ -300,9 +260,9 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 			printf("arglist %s\n",arglist[i]);
 #endif
 
-		/*啪沤脰脝脦脛艗镁脙猫脢枚路没碌艙卤锚脳艗脢盲鲁枚*/
+		/*复制文件描述符到标准输出*/
 		dup2(globalfd,1);
-		/* 脰沤脨脨脙眉脕卯 */
+		/* 执行命令 */
 		if(execv(arglist[0],arglist)<0)
 			printf("exec failed\n");
 		exit(1);
@@ -314,14 +274,14 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 void do_deq(struct jobcmd deqcmd)
 {
 	int deqid,i;
-	struct queue *p,*prev,*select,*selectprev;
+	struct waitqueue *p,*prev,*select,*selectprev;
 	deqid=atoi(deqcmd.data);
 
 #ifdef DEBUG
 	printf("deq jid %d\n",deqid);
 #endif
 
-	/*current jodid==deqid,脰脮脰鹿碌卤脟掳脳梅脪碌*/
+	/*current jodid==deqid,终止当前作业*/
 	if (current && current->job->jid ==deqid){
 		printf("teminate current job\n");
 		kill(current->job->pid,SIGKILL);
@@ -334,7 +294,7 @@ void do_deq(struct jobcmd deqcmd)
 		free(current);
 		current=NULL;
 	}
-	else{ /* 禄貌脮脽脭脷碌脠沤媒露脫脕脨脰脨虏茅脮脪deqid */
+	else{ /* 或者在等待队列中查找deqid */
 		select=NULL;
 		selectprev=NULL;
 		if(head){
@@ -363,20 +323,20 @@ void do_deq(struct jobcmd deqcmd)
 
 void do_stat(struct jobcmd statcmd)
 {
-	struct queue *p;
+	struct waitqueue *p;
 	char timebuf[BUFLEN];
 	/*
-	*沤貌脫隆脣霉脫脨脳梅脪碌碌脛脥鲁艗脝脨脜脧垄:
-	*1.脳梅脪碌ID
-	*2.艙酶鲁脤ID
-	*3.脳梅脪碌脣霉脫脨脮脽
-	*4.脳梅脪碌脭脣脨脨脢卤艗盲
-	*5.脳梅脪碌碌脠沤媒脢卤艗盲
-	*6.脳梅脪碌沤沤艙拧脢卤艗盲
-	*7.脳梅脪碌脳沤脤卢
+	*打印所有作业的统计信息:
+	*1.作业ID
+	*2.进程ID
+	*3.作业所有者
+	*4.作业运行时间
+	*5.作业等待时间
+	*6.作业创建时间
+	*7.作业状态
 	*/
 
-	/* 沤貌脫隆脨脜脧垄脥路虏驴 */
+	/* 打印信息头部 */
 	printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
 	if(current){
 		strcpy(timebuf,ctime(&(current->job->create_time)));
@@ -410,45 +370,28 @@ int main()
 	struct itimerval new,old;
 	struct stat statbuf;
 	struct sigaction newact,oldact1,oldact2;
-	printf("error");
-	//creat_Q();
-	//head=Q;
-	#ifdef DEBUG
-		printf("Debug is open!");
-	#endif
-	/*
-	struct sigaction{
-  	void (*sa_handler)(int);
-   	sigset_t sa_mask;
-  	int sa_flag;
-  	void (*sa_sigaction)(int,siginfo_t *,void *);
-	};*/
-		
 
 	if(stat("/tmp/server",&statbuf)==0){
-		/* 脠莽鹿没FIFO脦脛艗镁沤忙脭脷,脡鸥碌么 */
+		/* 如果FIFO文件存在,删掉 */
 		if(remove("/tmp/server")<0)
 			error_sys("remove failed");
 	}
 
 	if(mkfifo("/tmp/server",0666)<0)
 		error_sys("mkfifo failed");
-	/* 脭脷路脟脳猫脠没脛拢脢艙脧脗沤貌驴陋FIFO */
+	/* 在非阻塞模式下打开FIFO */
 	if((fifo=open("/tmp/server",O_RDONLY|O_NONBLOCK))<0)
 		error_sys("open fifo failed");
 
-	/* 艙拧脕垄脨脜潞脜沤艩脌铆潞炉脢媒 */
+	/* 建立信号处理函数 */
 	newact.sa_sigaction=sig_handler;
 	sigemptyset(&newact.sa_mask);
 	newact.sa_flags=SA_SIGINFO;
 	sigaction(SIGCHLD,&newact,&oldact1);
 	sigaction(SIGVTALRM,&newact,&oldact2);
 
-	/* 脡猫脰脙脢卤艗盲艗盲啪么脦陋1000潞脕脙毛 */
-	if(current==NULL)
-		printf("NULL error ");
-	else printf("error");
-	interval.tv_sec=current->round;
+	/* 设置时间间隔为1000毫秒 */
+	interval.tv_sec=1;
 	interval.tv_usec=0;
 
 	new.it_interval=interval;
