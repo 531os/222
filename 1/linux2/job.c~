@@ -145,7 +145,6 @@ void jobswitch()
 	char timebuf[BUFLEN];
 	if(head!=NULL)
 		printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
-	else printf("NULL\n");
 	for(k=head;k!=NULL;k=k->next){
 		strcpy(timebuf,ctime(&(k->job->create_time)));
 		timebuf[strlen(timebuf)-1]='\0';
