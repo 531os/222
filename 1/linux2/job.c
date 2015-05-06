@@ -134,6 +134,7 @@ void jobswitch()
 		current = next;
 		next = NULL;
 		current->job->state = RUNNING;
+		printf("continue the job--------:%d\n",current->job->pid);
 		kill(current->job->pid,SIGCONT);
 		return;
 	}
@@ -294,13 +295,12 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 	/*为作业创建进程*/
 	if((pid=fork())<0)
 		error_sys("enq fork failed");
-
 	if(pid==0){
 		newjob->pid =getpid();
+		printf("the newjob->pid is****************:%d\n",newjob->pid);
 		/*阻塞子进程,等等执行*/
 		raise(SIGSTOP);
 #ifdef DEBUG
-
 		printf("begin running\n");
 		for(i=0;arglist[i]!=NULL;i++)
 			printf("arglist %s\n",arglist[i]);
@@ -314,6 +314,8 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 		exit(1);
 	}else{
 		newjob->pid=pid;
+		wait(NULL);
+		printf("the pid is****************:%d\n",pid);
 	}
 }
 
