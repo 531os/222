@@ -17,8 +17,9 @@ int siginfo=1;
 int fifo;
 int globalfd;
 
-struct waitqueue *head=NULL;
-struct waitqueue *next=NULL,*current =NULL;
+struct queue *Q=NULL,*head=NULL;
+
+struct queue *next=NULL,*current =NULL;
 
 /* 调度程序 */
 void scheduler()
@@ -65,10 +66,58 @@ int allocjid()
 {
 	return ++jobid;
 }
+int add_round(int round)
+{
+	if(round==1)
+		return 2;
+	else if(round==2)
+		return 5;
+	else if(round==5)
+		return 5;
+	else  return-1;
+}
+void creat_Q()
+{
+	struct queue *tmp;
+	int i=0;
+ 	if((tmp = (struct queue *)malloc(sizeof(struct queue)))==NULL)  
+	{
+		perror("malloc");  
+		exit(1);  
+	}
+	tmp->job=NULL;
+	tmp ->prio = i+1;
+	tmp->round=1;
+	tmp->next=NULL;
+	i++;  
+	Q=tmp;
+	if((tmp = (struct queue *)malloc(sizeof(struct queue)))==NULL)  
+	{
+		perror("malloc");  
+		exit(1);  
+	}
+	tmp->job=NULL;
+	tmp ->prio = i+1;
+	tmp->round=2;
+	tmp->next=NULL;
+	i++; 
+	Q->next=tmp; 
+	if((tmp = (struct queue *)malloc(sizeof(struct queue)))==NULL)  
+	{
+		perror("malloc");  
+		exit(1);  
+	}
+	tmp->job=NULL;
+	tmp ->prio = i+1;
+	tmp->round=5;
+	tmp->next=NULL;
+	i++;  
+ 	Q->next->next=tmp;
+}
 
 void updateall()
 {
-	struct waitqueue *p;
+	struct queue *p;
 
 	/* 更新作业运行时间 */
 	if(current)
@@ -77,16 +126,16 @@ void updateall()
 	/* 更新作业等待时间及优先级 */
 	for(p = head; p != NULL; p = p->next){
 		p->job->wait_time += 1000;
-		if(p->job->wait_time >= 5000 && p->job->curpri < 3){
+		if(p->job->wait_time >= 10000 && p->job->curpri < 3){
 			p->job->curpri++;
 			p->job->wait_time = 0;
 		}
 	}
 }
 
-struct waitqueue* jobselect()
+struct queue* jobselect()
 {
-	struct waitqueue *p,*prev,*select,*selectprev;
+	struct queue *p,*prev,*select,*selectprev;
 	int highest = -1;
 
 	select = NULL;
@@ -108,7 +157,7 @@ struct waitqueue* jobselect()
 
 void jobswitch()
 {
-	struct waitqueue *p;
+	struct queue *p;
 	int i;
 
 	if(current && current->job->state == DONE){ /* 当前作业完成 */
@@ -141,8 +190,8 @@ void jobswitch()
 	else if (next != NULL && current != NULL){ /* 切换作业 */
 #ifdef DEBUG
 	printf("current job is:%d\n",current->job->jid);
-	printf("next job is:%d\nthe waitQueue is\n",next->job->jid);
-	struct waitqueue *k;
+	printf("next job is:%d\nthe struct queue is\n",next->job->jid);
+	struct queue *k;
 	char timebuf[BUFLEN];
 	if(head!=NULL)
 		printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
@@ -199,7 +248,7 @@ case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 case SIGCHLD: /* 子进程结束时传送给父进程的信号 */
 /*#ifdef DEBUG
 	{
-	struct waitqueue *k;
+	struct queue *k;
 	k=current;
 	printf("the job is Done!!!:%d\n",current->job->jid);
 	printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
@@ -237,7 +286,7 @@ case SIGCHLD: /* 子进程结束时传送给父进程的信号 */
 
 void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 {
-	struct waitqueue *newnode,*p;
+	struct queue *newnode,*p;
 	int i=0,pid;
 	char *offset,*argvec,*q;
 	char **arglist;
@@ -281,7 +330,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 #endif
 
 	/*向等待队列中增加新的作业*/
-	newnode = (struct waitqueue*)malloc(sizeof(struct waitqueue));
+	newnode = (struct queue*)malloc(sizeof(struct queue));
 	newnode->next =NULL;
 	newnode->job=newjob;
 
@@ -322,7 +371,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 void do_deq(struct jobcmd deqcmd)
 {
 	int deqid,i;
-	struct waitqueue *p,*prev,*select,*selectprev;
+	struct queue *p,*prev,*select,*selectprev;
 	deqid=atoi(deqcmd.data);
 
 #ifdef DEBUG
@@ -371,7 +420,7 @@ void do_deq(struct jobcmd deqcmd)
 
 void do_stat(struct jobcmd statcmd)
 {
-	struct waitqueue *p;
+	struct queue *p;
 	char timebuf[BUFLEN];
 	/*
 	*打印所有作业的统计信息:

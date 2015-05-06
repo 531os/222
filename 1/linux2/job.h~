@@ -67,7 +67,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd);
 void do_deq(struct jobcmd deqcmd);
 void do_stat(struct jobcmd statcmd);
 void updateall();
-struct queue* jobselect();
+struct waitqueue* jobselect();
 void jobswitch();
 
 void error_doit(int errnoflag,const char *fmt,va_list ap);
