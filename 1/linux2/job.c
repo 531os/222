@@ -134,7 +134,7 @@ void jobswitch()
 		current = next;
 		next = NULL;
 		current->job->state = RUNNING;
-		printf("continue the job--------:%d\n",current->job->pid);
+		//printf("continue the job--------:%d\n",current->job->pid);
 		kill(current->job->pid,SIGCONT);
 		return;
 	}
@@ -297,7 +297,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 		error_sys("enq fork failed");
 	if(pid==0){
 		newjob->pid =getpid();
-		printf("the newjob->pid is****************:%d\n",newjob->pid);
+		//printf("the newjob->pid is****************:%d\n",newjob->pid);
 		/*阻塞子进程,等等执行*/
 		raise(SIGSTOP);
 #ifdef DEBUG
@@ -315,7 +315,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 	}else{
 		newjob->pid=pid;
 		wait(NULL);
-		printf("the pid is****************:%d\n",pid);
+		//printf("the pid is****************:%d\n",pid);
 	}
 }
 

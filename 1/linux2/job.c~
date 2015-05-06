@@ -315,7 +315,6 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd)
 	}else{
 		newjob->pid=pid;
 		wait(NULL);
-		}
 		printf("the pid is****************:%d\n",pid);
 	}
 }
