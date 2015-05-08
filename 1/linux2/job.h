@@ -50,15 +50,20 @@ struct jobinfo{
 struct waitqueue{
     struct waitqueue *next;
     struct jobinfo *job;
+    int round;
 };
 struct queue{
-	struct jobinfo *job;
+	struct waitqueue *wq;
 	int prio;
 	int round;
 	struct queue *next;
 };
 
 void scheduler();
+void creat_Q();
+void tell_before();
+void tell_after();
+int add_round();
 void sig_handler(int sig,siginfo_t *info,void *notused);
 int allocjid();
 void add_queue(struct jobinfo *job);
@@ -67,7 +72,7 @@ void do_enq(struct jobinfo *newjob,struct jobcmd enqcmd);
 void do_deq(struct jobcmd deqcmd);
 void do_stat(struct jobcmd statcmd);
 void updateall();
-struct queue* jobselect();
+struct waitqueue* jobselect();
 void jobswitch();
 
 void error_doit(int errnoflag,const char *fmt,va_list ap);
