@@ -10,7 +10,7 @@
 #include <time.h>
 #include "job.h"
 
-#define DEBUG
+//#define DEBUG
 
 int jobid=0;
 int siginfo=1;
@@ -250,22 +250,39 @@ void updateall()
 		current->job->run_time += 1; /* 加1代表1000ms */
 	/* 更新作业等待时间及优先级 */
 	for(r=p = head; p != NULL; p = p->next){
-		for(prev_f=f=p->wq;f!=NULL;f=f->next,prev_f=f){
+		for(prev_f=f=p->wq;f!=NULL;prev_f=f,f=f->next){
 			f->job->wait_time += 1000;
-			if(f->job->wait_time >= 10000&&p!=r){
+			if(f->job->wait_time >= 10000&&p!=head){
+				printf("one job upgrade!\n");
+				f->job->wait_time=0;
 				if(p->round==2){
 					r=head;
-					for(re=r->wq;re!=NULL;re=re->next)
-						;
-					re=f;
-					prev_f->next=f->next;
+					re=r->wq;
+					if(prev_f==f)
+						head->next->wq=head->next->wq->next;
+					else
+						prev_f->next=f->next;
+					if(re!=NULL){
+						for(;re->next!=NULL;re=re->next)
+							;
+						re->next=f;
+					}
+					else head->wq=f;
 				}
 				if(p->round==5){
 					r=head->next;
-					for(re=r->wq;re!=NULL;re=re->next)
-						;
-					re=f;
-					prev_f->next=f->next;
+					re=r->wq;
+					if(prev_f==f)
+						head->next->next->wq=head->next->next->wq->next;
+					else
+						prev_f->next=f->next;
+					f->next=NULL;
+					if(re!=NULL){
+						for(;re->next!=NULL;re=re->next)
+							;
+						re->next=f;
+					}
+					else head->next->wq=f;
 				}
 			}
 		}
@@ -420,7 +437,7 @@ void sig_handler(int sig,siginfo_t *info,void *notused)
 case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 	{
 	i++;
-	printf("i=====%d\n",i);
+	//printf("i=====%d\n",i);
 	scheduler();
 	}
 #ifdef DEBUG

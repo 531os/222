@@ -10,7 +10,7 @@
 #include <time.h>
 #include "job.h"
 
-#define DEBUG
+//#define DEBUG
 
 int jobid=0;
 int siginfo=1;
@@ -250,22 +250,39 @@ void updateall()
 		current->job->run_time += 1; /* 加1代表1000ms */
 	/* 更新作业等待时间及优先级 */
 	for(r=p = head; p != NULL; p = p->next){
-		for(prev_f=f=p->wq;f!=NULL;f=f->next,prev_f=f){
+		for(prev_f=f=p->wq;f!=NULL;prev_f=f,f=f->next){
 			f->job->wait_time += 1000;
-			if(f->job->wait_time >= 10000&&p!=r){
+			if(f->job->wait_time >= 10000&&p!=head){
+				printf("the job upgrade!\n");
+				f->job->wait_time=0;
 				if(p->round==2){
 					r=head;
-					for(re=r->wq;re!=NULL;re=re->next)
-						;
-					re=f;
-					prev_f->next=f->next;
+					re=r->wq;
+					if(prev_f==f)
+						head->next->wq=head->next->wq->next;
+					else
+						prev_f->next=f->next;
+					if(re!=NULL){
+						for(;re->next!=NULL;re=re->next)
+							;
+						re->next=f;
+					}
+					else head->wq=f;
 				}
 				if(p->round==5){
 					r=head->next;
-					for(re=r->wq;re!=NULL;re=re->next)
-						;
-					re=f;
-					prev_f->next=f->next;
+					re=r->wq;
+					if(prev_f==f)
+						head->next->next->wq=head->next->next->wq->next;
+					else
+						prev_f->next=f->next;
+					f->next=NULL;
+					if(re!=NULL){
+						for(;re->next!=NULL;re=re->next)
+							;
+						re->next=f;
+					}
+					else head->next->wq=f;
 				}
 			}
 		}
@@ -420,7 +437,7 @@ void sig_handler(int sig,siginfo_t *info,void *notused)
 case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 	{
 	i++;
-	printf("i=====%d\n",i);
+	//printf("i=====%d\n",i);
 	scheduler();
 	}
 #ifdef DEBUG
@@ -428,27 +445,10 @@ case SIGVTALRM: /* 到达计时器所设置的计时间隔 */
 #endif
 	return;
 case SIGCHLD: /* 子进程结束时传送给父进程的信号 */
-/*#ifdef DEBUG
-	{
-	struct queue *k;
-	k=current;
-	printf("the job is Done!!!:%d\n",current->job->jid);
-	printf("JOBID\tPID\tOWNER\tRUNTIME\tWAITTIME\tCREATTIME\t\tSTATE\n");
- 	char timebuf[BUFLEN];
-	for(k=head;k!=NULL;k=k->next){
-		strcpy(timebuf,ctime(&(k->wq->job->create_time)));
-		timebuf[strlen(timebuf)-1]='\0';
-		printf("%d\t%d\t%d\t%d\t%d\t%s\t%s\n",
-			k->wq->job->jid,
-			k->wq->job->pid,
-			k->wq->job->ownerid,
-			k->wq->job->run_time,
-			k->wq->job->wait_time,
-			timebuf,
-			"READY");
-	}
-	}
-#endif*/
+
+#ifdef DEBUG
+	tell_after();
+#endif
 	ret = waitpid(-1,&status,WNOHANG);
 	if (ret == 0)
 		return;
